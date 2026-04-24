@@ -12,6 +12,7 @@
 #define BACKSPACE 8
 #define TAB 9
 #define NEWLINE 10
+#define ESCAPE 27
 
 #define printv(fmt, ...) do { if (verbose) fprintf(stderr, fmt, ##__VA_ARGS__); } while (0)
 
@@ -287,8 +288,10 @@ char **handleAutoComplete(char *line) {
 
 
 char *readline() {
+  printf("HISTORY IDX: %d\n>", history_idx);
+  fflush(stdout);
   int arg_idx = 0;
-  
+  int currentHistory_idx = history_idx; 
   char *buffer = malloc(128);
   char c;
   int escape_sequence = 0;
@@ -297,26 +300,76 @@ char *readline() {
   buffer[idx] = '\0';
   while (read(STDIN_FILENO, &c, 1) == 1) {
     // if were not in an escape sequence AND C is a Printable Character and C is NOT DEL
-    
-    if (!escape_sequence && c >= 32 && c != DEL) {
+    if (escape_sequence) {
+      if (c == 'A') { //Arrow UP
+        escape_sequence = 0;
+        if (currentHistory_idx > 0) {
+        currentHistory_idx--;
+        //Visual
+          //clear Visual
+        for (int i = idx; i > 0; i--) {
+          printf("\b \b");
+        }
+          //put command
+        printf(history[currentHistory_idx]);
+
+        strcpy(buffer, history[currentHistory_idx]);
+        idx = strlen(buffer);
+        //Buffer
+        }
+
+        //index
+      } else if (c == 'B') { //Arrow Down
+        escape_sequence = 0;
+        if (currentHistory_idx == history_idx-1) {
+          currentHistory_idx++;
+          for (int i = idx; i > 0; i--) {
+          printf("\b \b");
+          }
+          idx = 0;
+          buffer[0] = '\0';
+
+        }
+        else if (currentHistory_idx < history_idx-1) {
+          currentHistory_idx++;
+        for (int i = idx; i > 0; i--) {
+          printf("\b \b");
+        }
+          //put command
+        printf(history[currentHistory_idx]);
+
+        strcpy(buffer, history[currentHistory_idx]);
+        idx = strlen(buffer);
+
+        }
+
+        
+      } else if (c == 'C') { //Arrow Right
+        escape_sequence = 0;
+      } else if (c=='D') { //Arrow Left
+        escape_sequence = 0;
+      }
+
+      
+      fflush(stdout);
+    } else if (c >= 32 && c != DEL) {
       write(STDOUT_FILENO, &c, sizeof(char));
       buffer[idx] = c;
       idx++;
       buffer[idx] = '\0';
-      } else if (!escape_sequence && c == DEL && idx > 0) {
+    } else if (c == ESCAPE) {
+      escape_sequence = 1;
+    } else if (c == DEL && idx > 0) {
         write(STDOUT_FILENO, "\b \b", 3 * sizeof(char));
         idx--;
         buffer[idx] = '\0';
 
-      } else if (!escape_sequence && c == '\n') {
+    } else if (c == '\n') {
         write(STDOUT_FILENO, "\n", sizeof(char));
-
         break;
-        
-      } else if (!escape_sequence && c == '\t') {
+    } else if (c == '\t') {
         buffer[idx] = '\0';
         fflush(stdout);
-          
         char **buff = handleAutoComplete(buffer);
 
         //Nothing to Autocomplete
