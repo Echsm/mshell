@@ -16,7 +16,10 @@
 #define printv(fmt, ...) do { if (verbose) fprintf(stderr, fmt, ##__VA_ARGS__); } while (0)
 
 int verbose;
+int fileBasedHistory = 0;
 char **path;
+char **history;
+int history_idx = 0;
 
 void generatePath() {
   printv("Start Generating PATH\n");
@@ -130,6 +133,15 @@ int msh_cd(char **args) {
   return 1;
 }
 
+int msh_history() {
+  int idx = 0;
+
+  while (idx < history_idx) {
+    printf("%d %s\n", idx, history[idx]);
+    idx++;    
+  }
+  
+}
 char **getAutocompleteFiles(char *filter, char *directory) {
   char **files = malloc(128 * sizeof(char *));
   DIR *dir = opendir(directory);
@@ -416,9 +428,13 @@ int msh_launch(char **args) {
 int msh_execute(char **args) {
   if (strcmp(args[0],"cd") == 0) {
     return msh_cd(args);
-  } else {
+  }
+  else if (strcmp(args[0], "history") == 0) {
+    return msh_history();
+  }
+  else {
       return msh_launch(args);
-    } 
+  } 
 }
 
 void msh_loop() {
@@ -428,7 +444,13 @@ void msh_loop() {
   do {
     printStart();
     fflush(stdout);
-    line  = readline();
+    line = readline();
+
+    history[history_idx] = malloc(sizeof(char) * 128);
+    strcpy(history[history_idx],line);
+    history_idx++;
+    history[history_idx] = NULL;
+    
     args = tokenize(line);
     status = msh_execute(args);
     free(line);
@@ -449,6 +471,7 @@ int main(int argc, char **argv) {
   tcgetattr(STDIN_FILENO, &oldt);
   newt = oldt;
 
+  history = malloc(sizeof(char *) * 128);
 
   // flags are bitmasks, this sets ICANON bit to 0
   newt.c_lflag &= ~(ICANON | ECHO);  // disable canonical mode + echo
