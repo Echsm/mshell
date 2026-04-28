@@ -17,3 +17,5 @@ This is not (yet) a safe Shell. There are a lot of issues regarding bounds check
 - [ ] Piping
 - [ ] Math preprocessor with (echo \`3+4\`)
 - [ ] Variable Substitution (echo $PATH)
+- [ ] * or proper regex parsing
+- [ ] outputting to files with >>

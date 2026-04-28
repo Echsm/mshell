@@ -288,7 +288,6 @@ char **handleAutoComplete(char *line) {
 
 
 char *readline() {
-  printf("HISTORY IDX: %d\n>", history_idx);
   fflush(stdout);
   int arg_idx = 0;
   int currentHistory_idx = history_idx; 
@@ -418,8 +417,8 @@ char *readline() {
 
 
 char **tokenize(char* line) {
-  int tokens_buffsize = 64;
-  int token_buffsize = 64;
+  int tokens_buffsize = 128;
+  int token_buffsize = 512;
 
   //platz für 64 pointer zu tokens
   char **tokens = malloc(tokens_buffsize * sizeof(char*));
@@ -490,6 +489,37 @@ int msh_execute(char **args) {
   } 
 }
 
+
+
+int containsWildcard(char *arg) {
+  int idx = 0;
+
+  while (arg[idx] != '\0') {
+    if (arg[idx] == '?' || arg[idx] == '*') {
+      return 1;
+    }
+    idx++;
+  }
+  return 0;
+}
+void preprocess(char ***argp) {
+  int idx = 0;
+  char **args = *argp;
+  while (args[idx] != NULL) {
+    if (args[idx][0] == '$') {
+      strcpy(args[idx], getenv(&args[idx][1]));
+    } else if (args[idx][0] == '`') {
+      printf("MATH SUBSTITUTION");
+    } else if (containsWildcard((*argp)[idx])) {
+      printf("WILDCARD SUBSTITUTION");
+    }
+
+    
+    fflush(stdout);
+    idx++;
+  }
+}
+
 void msh_loop() {
   char *line;
   char **args;
@@ -505,6 +535,7 @@ void msh_loop() {
     history[history_idx] = NULL;
     
     args = tokenize(line);
+    preprocess(&args);
     status = msh_execute(args);
     free(line);
     free(args);
