@@ -6,7 +6,7 @@
 #include<linux/limits.h>
 #include <dirent.h>
 #include <termios.h>
-
+#include"wildcard.h"
 
 #define DEL 127
 #define BACKSPACE 8
@@ -17,10 +17,12 @@
 #define printv(fmt, ...) do { if (verbose) fprintf(stderr, fmt, ##__VA_ARGS__); } while (0)
 
 int verbose;
+char *home;
 int fileBasedHistory = 0;
 char **path;
 char **history;
 int history_idx = 0;
+
 
 void generatePath() {
   printv("Start Generating PATH\n");
@@ -124,25 +126,16 @@ int startswith(char *substring, char *string) {
 }
 
 int msh_cd(char **args) {
-  if (args[1] == NULL) {
-    printf("Argument expected for cd");
-  } else {
-    if (chdir(args[1]) != 0) {
-      perror("msh");
-    }
-  }
+  if (args[1] == NULL) printf("Argument expected for cd");
+  else if (chdir(args[1]) != 0) perror("msh");
   return 1;
 }
 
 int msh_history() {
-  int idx = 0;
-
-  while (idx < history_idx) {
-    printf("%d %s\n", idx, history[idx]);
-    idx++;    
-  }
-  
+  for (int idx = 0; idx < history_idx; idx++) printf("%d %s\n", idx, history[idx]);
+  return 1;
 }
+
 char **getAutocompleteFiles(char *filter, char *directory) {
   char **files = malloc(128 * sizeof(char *));
   DIR *dir = opendir(directory);
@@ -156,10 +149,7 @@ char **getAutocompleteFiles(char *filter, char *directory) {
   while ((entry = readdir(dir)) != NULL) {
         // Print only regular files (excluding "." and "..")
         
-        if (entry->d_type == DT_DIR) {
-            strcat(entry->d_name, "/");
-        }
-
+        if (entry->d_type == DT_DIR) strcat(entry->d_name, "/");
         if (startswith(filter, entry->d_name)) {
           files[idx] = malloc(sizeof(char * ) * NAME_MAX);
           strcpy(files[idx], entry->d_name);
@@ -193,11 +183,8 @@ char **handleAutoComplete(char *line) {
   int cmdtyped = 0;
   
   //Nothing typed yet -> No autocomplete available
-  if (line[0] == '\0') {
-    return out;
-  }
-
-
+  if (line[0] == '\0') return out;
+  
   char *lastarg = malloc(PATH_MAX);
   lastarg[0] = '\0';
 
@@ -310,7 +297,7 @@ char *readline() {
           printf("\b \b");
         }
           //put command
-        printf(history[currentHistory_idx]);
+        printf("%s",history[currentHistory_idx]);
 
         strcpy(buffer, history[currentHistory_idx]);
         idx = strlen(buffer);
@@ -335,14 +322,12 @@ char *readline() {
           printf("\b \b");
         }
           //put command
-        printf(history[currentHistory_idx]);
+        printf("%s",history[currentHistory_idx]);
 
         strcpy(buffer, history[currentHistory_idx]);
         idx = strlen(buffer);
 
-        }
-
-        
+        }        
       } else if (c == 'C') { //Arrow Right
         escape_sequence = 0;
       } else if (c=='D') { //Arrow Left
@@ -491,30 +476,39 @@ int msh_execute(char **args) {
 
 
 
-int containsWildcard(char *arg) {
-  int idx = 0;
+//int containsWildcard(char *arg) {
+//  for (int idx = 0; arg[idx] != '\0'; idx++) {
+//    if (arg[idx] == '?' || arg[idx] == '*') return 1;
+//  }
+//  return 0;
+//}
 
-  while (arg[idx] != '\0') {
-    if (arg[idx] == '?' || arg[idx] == '*') {
-      return 1;
-    }
-    idx++;
-  }
-  return 0;
-}
 void preprocess(char ***argp) {
   int idx = 0;
   char **args = *argp;
   while (args[idx] != NULL) {
     if (args[idx][0] == '$') {
       strcpy(args[idx], getenv(&args[idx][1]));
+    } else if (args[idx][0] == '~') {
+      char *start = malloc(NAME_MAX * sizeof(char));
+      strcpy(start, &args[idx][1]);
+      strcpy(args[idx], home);
+      strcat(args[idx], start);
+      idx--; //Redo because there may be a wildcard
     } else if (args[idx][0] == '`') {
       printf("MATH SUBSTITUTION");
-    } else if (containsWildcard((*argp)[idx])) {
-      printf("WILDCARD SUBSTITUTION");
-    }
+    } else if (containsWildcard(args[idx])) {
+      char **matches = generateMatches(args[idx]);
 
-    
+      //for (int i = 0; matches[i] != NULL; i++) printf("%s,",matches[i]);
+      args[idx] = NULL;
+      char **tail = malloc(sizeof(char *) * 128);
+      ptrcpy((void *)tail, (void *) &args[idx+1]);
+      ptrcat((void *)args, (void *)matches);
+      ptrcat((void *)args, (void *)tail);
+      
+      
+      }
     fflush(stdout);
     idx++;
   }
@@ -538,12 +532,16 @@ void msh_loop() {
     preprocess(&args);
     status = msh_execute(args);
     free(line);
+    for (int i = 0; args[i] != NULL; i++) {
+      free(args[i]);
+    }
     free(args);
   } while (status);
 }
 
 
 int main(int argc, char **argv) {
+  home ="/home/mirko";
   verbose = 0;
   if (argc > 1) {
     if (strcmp(argv[1],"-v") == 0) {
