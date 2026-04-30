@@ -138,10 +138,22 @@ int msh_history() {
 
 char **getAutocompleteFiles(char *filter, char *directory) {
   char **files = malloc(128 * sizeof(char *));
-  DIR *dir = opendir(directory);
+  DIR *dir;
+  if (directory[0] == '~') {
+    char *tmp = malloc(128);
+
+    strcpy(tmp, home);
+    strcat(tmp, &directory[1]);
+    dir = opendir(tmp);
+    free(tmp);
+  } else {
+    dir = opendir(directory);
+  }
+  
   if (dir == NULL) {
-    printf("\n%s|%s", filter, directory);
+    printf("\n%s|%s\n", filter, directory);
     perror("opendir");
+    return NULL;
   }
   
   struct dirent *entry;

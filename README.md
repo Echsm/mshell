@@ -13,10 +13,12 @@ This is not (yet) a safe Shell. There are a lot of issues regarding bounds check
 - [x] Autocomplete executables on PATH for the first Argument
 - [x] Autocomplete Files/Directories for non-first Argument
 - [x] History
-- [ ] Using ~ as an aLias for /home/$USER (modify Autocompletion code AND wildcard Code AND Preprocesssor)
-- [ ] Math preprocessor with (echo \`3+4\`)
+- [x] Using ~ as an alias for /home/$USER (modify Preprocesssor)
+- [x] ~ alias works with autocomplete
 - [x] Variable Substitution (echo $PATH)
-- [ ] Wildcards (* and ?)
-- [ ] outputting to files with >>
+- [x] Wildcards (* and ?)
+- [ ] Math preprocessor with (echo \`3+4\`)
+- [ ] outputting/appending to files with > / >> (ONLY IF >> and FILE are the last 2 args);
+- [ ] remove last word with CTRL + BACKSPACE
 - [ ] navigating the character pointer and inserting characters mid string
 - [ ] Piping
