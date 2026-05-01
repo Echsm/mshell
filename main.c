@@ -7,6 +7,7 @@
 #include <dirent.h>
 #include <termios.h>
 #include"wildcard.h"
+#include"inlinemath.h"
 
 #define DEL 127
 #define BACKSPACE 8
@@ -508,8 +509,10 @@ void preprocess(char ***argp) {
       strcat(args[idx], start);
       idx--; //Redo because there may be a wildcard
     } else if (args[idx][0] == '`') {
-      printf("MATH SUBSTITUTION");
-    } else if (containsWildcard(args[idx])) {
+      char *res = mathEvaluateExpression(args[idx]);
+      strcpy(args[idx], res);
+      free(res);
+        } else if (containsWildcard(args[idx])) {
       char **matches = generateMatches(args[idx]);
 
       //for (int i = 0; matches[i] != NULL; i++) printf("%s,",matches[i]);

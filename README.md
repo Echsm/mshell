@@ -17,7 +17,7 @@ This is not (yet) a safe Shell. There are a lot of issues regarding bounds check
 - [x] ~ alias works with autocomplete
 - [x] Variable Substitution (echo $PATH)
 - [x] Wildcards (* and ?)
-- [ ] Math preprocessor with (echo \`3+4\`)
+- [x] Math preprocessor with (echo \`3+4\`) (includes Unary and Binary +-/*^, Parenthesis and support for Doubles)
 - [ ] outputting/appending to files with > / >> (ONLY IF >> and FILE are the last 2 args);
 - [ ] remove last word with CTRL + BACKSPACE
 - [ ] navigating the character pointer and inserting characters mid string
