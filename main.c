@@ -472,7 +472,6 @@ int msh_launch(char **args) {
       }
     }
   }
-      fflush(stdout);
 
   if (mode == 'w' || mode == 'a') args[idx-2] = NULL;
   
