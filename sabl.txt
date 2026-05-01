@@ -1,0 +1,12 @@
+testo
+bin
+inlinemath.c
+inlinemath.h
+LICENSE
+main.c
+Makefile
+out.txt
+README.md
+sabl.txt
+wildcard.c
+wildcard.h

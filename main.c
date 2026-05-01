@@ -6,6 +6,7 @@
 #include<linux/limits.h>
 #include <dirent.h>
 #include <termios.h>
+#include <fcntl.h>
 #include"wildcard.h"
 #include"inlinemath.h"
 
@@ -456,22 +457,64 @@ int msh_launch(char **args) {
   pid_t wpid;
   int status;
 
-  pid = fork();
 
+  char mode = 's'; //s for stdout;
+  int idx = 0;
+  while (args[idx] != NULL) {
+    idx++;
+  }
+
+  if (idx >= 2) {
+    if (args[idx-2][0] == '>') {
+      if (args[idx-2][1] == '\0') mode = 'w';
+      else if (args[idx-2][1] == '>') {
+        if (args[idx-2][2] == '\0') mode = 'a';
+      }
+    }
+  }
+      fflush(stdout);
+
+  if (mode == 'w' || mode == 'a') args[idx-2] = NULL;
+  
+  //if the second last Argument is > or >> then create the file and change the file descriptor, so it puts the stuff there;
+  int file_desc;
+  int stdout;
+  pid = fork();
   //Child Process
   if (pid == 0) {
-    execvp(args[0], args);
+
+    if (mode == 'a' || mode == 'w') {
+      file_desc = open(args[idx-1], O_CREAT | (mode == 'w' ? O_TRUNC : O_APPEND) | O_WRONLY, S_IRUSR | S_IWUSR);
+      stdout = 1;
+      //O_WRONLY | O_APPEND | O_CREAT
+      // O_WRONLY | O_CREAT O_TRUNC
+      dup2(file_desc, stdout); 
+  
+      execvp(args[0], args);
+
+      dup2(stdout, file_desc);
+      close(file_desc);
+
+    } else {
+      execvp(args[0], args);
+    }
   } else if (pid < 0) {
     perror("Cloning Process Failed");
   } else if (pid > 0) {
+    //change file descriptor back;
     do {
 
-    //fetch status from Process
+    //fetch status from Process;
     wpid = waitpid(pid, &status, WUNTRACED);
 
     //continue wating ONLY IF Process didnt exit and wasnt signaled to end
     } while (!WIFEXITED(status) && !WIFSIGNALED(status));
   }
+
+  //close file;
+  
+    
+
   return 1;
 }
 
