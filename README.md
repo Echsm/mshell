@@ -19,6 +19,9 @@ This is not (yet) a safe Shell. There are a lot of issues regarding bounds check
 - [x] Wildcards (* and ?)
 - [x] Math preprocessor with (echo \`3+4\`) (includes Unary and Binary +-/*^, Parenthesis and support for Doubles)
 - [x] outputting/appending to files with > / >> (ONLY IF >> and FILE are the last 2 args);
-- [ ] remove last word with CTRL + BACKSPACE
-- [ ] navigating the character pointer and inserting characters mid string
-- [ ] Piping
+- [x] Piping
+
+## Not Features :(
+
+- [ ] remove last word with CTRL + BACKSPACE (CTRL + BACKSPACE is not an escape sequence)
+- [ ] navigating the character pointer and inserting characters mid string (how tf do i even print something with white background? );
