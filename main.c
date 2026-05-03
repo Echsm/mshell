@@ -17,14 +17,27 @@
 #define ESCAPE 27
 
 #define printv(fmt, ...) do { if (verbose) fprintf(stderr, fmt, ##__VA_ARGS__); } while (0)
-
+char *pipe_filename;
+int piped = 0;
 int verbose;
 char *home;
 int fileBasedHistory = 0;
 char **path;
 char **history;
 int history_idx = 0;
+char **command_que;
 
+char *getArgFromFile(char * filename) {
+  FILE *fptr = fopen(filename, "r");
+  char *buff = malloc(sizeof(char) * 1024 * 1024);
+  char *tmpbuff = malloc(sizeof(char) * 128);
+  while (fgets(tmpbuff, sizeof(char) * 128, fptr)) {
+    strcat(buff, tmpbuff);
+  };
+  printf("%s",buff);
+  free(tmpbuff);
+  return buff;
+}
 
 void generatePath() {
   printv("Start Generating PATH\n");
@@ -207,8 +220,8 @@ char **handleAutoComplete(char *line) {
 
   int nSlashes = 0;
   int endsWithSlash = 0;
-
-
+  int hadSemicolon = 0;
+  
   while(1) {
     fflush(stdout);
 
@@ -216,7 +229,12 @@ char **handleAutoComplete(char *line) {
       fflush(stdout);
       break;
     } else if (line[idx] == ' ') {
-      cmdtyped = 1;
+        if (hadSemicolon == 0) {
+          cmdtyped = 1;
+
+        } else {
+          hadSemicolon = 0;
+        }
       lastarg_idx = 0;
       lastarg[0] = '\0';
       nSlashes = 0;
@@ -228,6 +246,14 @@ char **handleAutoComplete(char *line) {
         cmdtyped = 1;
         endsWithSlash = 1;
         nSlashes += 1;
+      } else if (line[idx] == ';') {
+        hadSemicolon = 1;
+        cmdtyped = 0;
+        lastarg_idx = 0;
+        lastarg[0] = '\0';
+        nSlashes = 0;
+        endsWithSlash = 0;
+        
       } else {
         endsWithSlash = 0;
       }
@@ -444,11 +470,27 @@ char **tokenize(char* line) {
       token_length = 0;
     } else if (c == '"') {
       inString = ~inString;
+    } else if (c == ';' && !inString) {
+      if (token_length != 0) {
+        tokens[token_position][token_length] = '\0';
+        token_position++;
+        tokens[token_position] = malloc(token_buffsize * sizeof(char));
+        strcpy(tokens[token_position], ";");
+        token_length = 1;
+      } else {
+        strcpy(tokens[token_position],";");
+        token_length = 1;
+      }
     } else if (c) {
       tokens[token_position][token_length] = c;
       token_length++;
     } 
   }
+
+  //for (int i = 0; tokens[i] != NULL; i++) {
+  //  printf("<%s>\n", tokens[i]);
+  //}
+  fflush(stdout);
   return tokens;
 }
 
@@ -457,62 +499,59 @@ int msh_launch(char **args) {
   pid_t wpid;
   int status;
 
-
-  char mode = 's'; //s for stdout;
-  int idx = 0;
-  while (args[idx] != NULL) {
-    idx++;
-  }
-
-  if (idx >= 2) {
-    if (args[idx-2][0] == '>') {
-      if (args[idx-2][1] == '\0') mode = 'w';
-      else if (args[idx-2][1] == '>') {
-        if (args[idx-2][2] == '\0') mode = 'a';
-      }
+  char in_mode = 's'; //s for stdin;
+  char out_mode = 's'; //s for stdout;
+  char *in;
+  char *out;
+  int in_idx;
+  int out_idx;
+  
+  for (int i = 0; args[i] != NULL; i++) {
+    if (i > 0 && args[i-1][0] == '>') {
+      out = args[i];
+      out_idx = i;
+      if (args[i-1][1] == '\0') out_mode = 'w';
+      else if (args[i-1][1] == '>' && args[i-1][2] == '\0') out_mode = 'a';
     }
-  }
 
-  if (mode == 'w' || mode == 'a') args[idx-2] = NULL;
+    if (i > 0 && args[i-1][0] == '<' && args[i-1][1] == '\0') {
+      in = args[i];
+      in_mode = 'i';
+      in_idx = i;
+    }
+  
+  }
+  if (in_mode == 'i') args[in_idx-1] = NULL;
+  if (out_mode == 'w' || out_mode == 'a') args[out_idx-1] = NULL;
   
   //if the second last Argument is > or >> then create the file and change the file descriptor, so it puts the stuff there;
-  int file_desc;
-  int stdout;
+  int fd_out = 0;
+  int fd_in = 0;
   pid = fork();
   //Child Process
   if (pid == 0) {
 
-    if (mode == 'a' || mode == 'w') {
-      file_desc = open(args[idx-1], O_CREAT | (mode == 'w' ? O_TRUNC : O_APPEND) | O_WRONLY, S_IRUSR | S_IWUSR);
-      stdout = 1;
-      //O_WRONLY | O_APPEND | O_CREAT
-      // O_WRONLY | O_CREAT O_TRUNC
-      dup2(file_desc, stdout); 
-  
-      execvp(args[0], args);
-
-      dup2(stdout, file_desc);
-      close(file_desc);
-
-    } else {
-      execvp(args[0], args);
+    if (in_mode == 'i') {
+      fd_in = open(in,O_RDONLY);
+      dup2(fd_in,STDIN_FILENO);
+      close(fd_in);
     }
-  } else if (pid < 0) {
-    perror("Cloning Process Failed");
+    
+    if (out_mode == 'a' || out_mode == 'w') {
+      fd_out = open(out, O_CREAT | (out_mode == 'w' ? O_TRUNC : O_APPEND) | O_WRONLY, S_IRUSR | S_IWUSR);
+      dup2(fd_out, STDOUT_FILENO);
+      close(fd_out);
+      }
+    
+    execvp(args[0], args);
+  } else if (pid < 0) {perror("Cloning Process Failed");
   } else if (pid > 0) {
-    //change file descriptor back;
     do {
-
     //fetch status from Process;
     wpid = waitpid(pid, &status, WUNTRACED);
-
     //continue wating ONLY IF Process didnt exit and wasnt signaled to end
     } while (!WIFEXITED(status) && !WIFSIGNALED(status));
   }
-
-  //close file;
-  
-    
 
   return 1;
 }
@@ -531,19 +570,72 @@ int msh_execute(char **args) {
 
 
 
-//int containsWildcard(char *arg) {
-//  for (int idx = 0; arg[idx] != '\0'; idx++) {
-//    if (arg[idx] == '?' || arg[idx] == '*') return 1;
-//  }
-//  return 0;
-//}
-
 void preprocess(char ***argp) {
+
+  
   int idx = 0;
   char **args = *argp;
+
+
   while (args[idx] != NULL) {
     if (args[idx][0] == '$') {
       strcpy(args[idx], getenv(&args[idx][1]));
+    
+    } else if (args[idx][0] == '|' && args[idx][1] == '\0' && args[idx+1] != NULL) {
+        fflush(stdout);
+        char **buff = malloc(sizeof(char *) * 256);
+        ptrcpy((void *) buff, (void *) &args[idx+1]);
+
+        strcpy(args[idx],">");
+        args[idx+1] = malloc(128);
+        strcpy(args[idx+1], pipe_filename);
+        args[idx+2] = malloc(128);
+        strcpy(args[idx+2],";");
+        args[idx+3] = NULL;
+        ptrcat((void *) args,(void *) buff);
+
+
+        for (int i = idx+3; 1; i++) {
+
+          if (args[i] == NULL) {
+            args[i] = malloc(128);
+            strcpy(args[i], "<");
+            args[i+1] = malloc(128);
+            strcpy(args[i+1], pipe_filename);
+            args[i+2] = NULL;
+            break;
+          } else if (args[i][0] == '|' && args[i][1] == '\0' || args[i][0] == ';' && args[i] [1] == '\0') {
+            ptrcpy((void *) buff,  (void *) &args[i]);
+            args[i] = malloc(128);
+            strcpy(args[i], "<");
+            args[i+1] = malloc(128);
+            strcpy(args[i+1], pipe_filename) ;
+            args[i+2] = NULL;
+
+            ptrcat((void *)args,(void *) buff);
+            break;
+          }
+          
+        }
+        pipe_filename[5] = pipe_filename[5] == '0' ? '1': '0';
+        free(buff);
+        
+       // for (int i = 0; args[i] != NULL; i++) {
+       //   printf("<%s>\n", args[i]);
+       //   fflush(stdout);
+       // }
+    //}
+    //else if (args[idx][0] == '#') {
+    //  if (args[idx][1] == '\0' && args[idx+1] != NULL) {
+    //    char *buff = getArgFromFile(args[idx+1]);
+    //    free(args[idx]);
+    //    args[idx] = buff;
+    //    free(args[idx+1]);
+    //    args[idx+1] = NULL;
+    //    ptrcat((void *) args, (void *)&args[idx+2]);
+
+    //  }
+      
     } else if (args[idx][0] == '~') {
       char *start = malloc(NAME_MAX * sizeof(char));
       strcpy(start, &args[idx][1]);
@@ -556,7 +648,6 @@ void preprocess(char ***argp) {
       free(res);
         } else if (containsWildcard(args[idx])) {
       char **matches = generateMatches(args[idx]);
-
       //for (int i = 0; matches[i] != NULL; i++) printf("%s,",matches[i]);
       args[idx] = NULL;
       char **tail = malloc(sizeof(char *) * 128);
@@ -565,10 +656,19 @@ void preprocess(char ***argp) {
       ptrcat((void *)args, (void *)tail);
       
       
+      } else if (args[idx][0] == ';') {
+        ptrcpy((void *) command_que, (void *) &args[idx+1]);
+        args[idx] = NULL;
+        idx--;
       }
     fflush(stdout);
     idx++;
   }
+
+//  for (int i=0; args[i] != NULL; i++) {
+//    printf("<%s>\n",args[i]);fflush(stdout);
+//  }
+
 }
 
 void msh_loop() {
@@ -576,19 +676,22 @@ void msh_loop() {
   char **args;
   int status;
   do {
-    printStart();
-    fflush(stdout);
-    line = readline();
-
-    history[history_idx] = malloc(sizeof(char) * 128);
-    strcpy(history[history_idx],line);
-    history_idx++;
-    history[history_idx] = NULL;
-    
-    args = tokenize(line);
+    if (*command_que == NULL) {
+      printStart();
+      fflush(stdout);
+      line = readline();
+      history[history_idx] = malloc(sizeof(char) * 128);
+      strcpy(history[history_idx],line);
+      history_idx++;
+      history[history_idx] = NULL;
+      args = tokenize(line);
+      free(line);
+    } else {
+      ptrcpy((void *) args, (void *) command_que);
+    }
+    *command_que = NULL;
     preprocess(&args);
     status = msh_execute(args);
-    free(line);
     for (int i = 0; args[i] != NULL; i++) {
       free(args[i]);
     }
@@ -598,6 +701,11 @@ void msh_loop() {
 
 
 int main(int argc, char **argv) {
+  pipe_filename = malloc(sizeof(char) * 32);
+  strcpy(pipe_filename, "/tmp/0mshell_pipe");
+  command_que = malloc(sizeof(char *) * 512);
+  *command_que = NULL;
+
   home ="/home/mirko";
   verbose = 0;
   if (argc > 1) {
