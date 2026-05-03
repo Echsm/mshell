@@ -624,17 +624,13 @@ void preprocess(char ***argp) {
        //   printf("<%s>\n", args[i]);
        //   fflush(stdout);
        // }
-    //}
-    //else if (args[idx][0] == '#') {
-    //  if (args[idx][1] == '\0' && args[idx+1] != NULL) {
-    //    char *buff = getArgFromFile(args[idx+1]);
-    //    free(args[idx]);
-    //    args[idx] = buff;
-    //    free(args[idx+1]);
-    //    args[idx+1] = NULL;
-    //    ptrcat((void *) args, (void *)&args[idx+2]);
-
-    //  }
+    }
+    else if (args[idx][0] == '#') {
+      if (args[idx][1] != '\0') {
+        char *buff = getArgFromFile(&args[idx][1]);
+        free(args[idx]);
+        args[idx] = buff;
+      }
       
     } else if (args[idx][0] == '~') {
       char *start = malloc(NAME_MAX * sizeof(char));
